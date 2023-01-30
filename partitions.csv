@@ -1,0 +1,10 @@
+# Name,   Type, SubType, Offset,  Size, Flags
+# Note: if you change the phy_init or app partition offset, make sure to change the offset in Kconfig.projbuild
+# 512K == 0x80000
+# Bootloader: size : 0x0000 ~ 0x3000	# real size: 0x2B40
+# Partition  table : 0x3000 ~ 0x4000	# real size: 0x0C00
+# Minimum size NVS : 0x3000
+nvs,      data, nvs, 0x4000, 0x3000,
+#phy_init, data, phy, 0xA000, 0x1000,
+factory,  app,  factory, 0x7000, 0x79000,
+storage,  data, spiffs,  0x80000, 3M, 

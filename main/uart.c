@@ -2,8 +2,6 @@
 #include "driver/uart.h"
 #include "uart.h"
 
-
-
 int16_t UART_RxByte(uint32_t nDelay)
 {
 	uint8_t nRcv = 0xFF;

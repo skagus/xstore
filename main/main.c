@@ -113,14 +113,16 @@ void app_main(void)
 		{
 			printf("Start Xmodem RX\n");
 			gCtx.nNext = 0;
-			nRet = xmodemTransmit(aXBuf, BUF_SIZE);
+			nRet = XM_Transmit(aXBuf, BUF_SIZE);
+			printf("Ret: %d\n", nRet);
 			break;
 		}
 		case 'R':
 		{
 			printf("Start Xmodem TX\n");
 			gCtx.nNext = 0;
-			nRet = xmodemReceive(aXBuf, BUF_SIZE);
+			nRet = XM_Receive(aXBuf, BUF_SIZE);
+			printf("Ret: %d\n", nRet);
 			break;
 		}
 		case 'D':

@@ -12,23 +12,22 @@
 #define CAN 0x18
 #define CTRLZ 0x1A
 
-#define DLY_1S 1000
 #define MAXRETRANS 25
 #define TRANSMIT_XMODEM_1K		(0)
 
-static int check(int crc, const unsigned char *buf, int sz)
+static int check(int crc, const uint8_t *buf, int sz)
 {
 	if (crc)
 	{
-		unsigned short crc = crc16_ccitt(buf, sz);
-		unsigned short tcrc = (buf[sz] << 8) + buf[sz + 1];
+		uint16_t crc = CRC16_ccitt(buf, sz);
+		uint16_t tcrc = (buf[sz] << 8) + buf[sz + 1];
 		if (crc == tcrc)
 			return 1;
 	}
 	else
 	{
 		int i;
-		unsigned char cks = 0;
+		uint8_t cks = 0;
 		for (i = 0; i < sz; ++i)
 		{
 			cks += buf[i];
@@ -40,47 +39,43 @@ static int check(int crc, const unsigned char *buf, int sz)
 	return 0;
 }
 
-static void flushinput(void)
+int XM_Receive(uint8_t* pBuf, int nReqSize)
 {
-	while (_inbyte(((DLY_1S)*3) >> 1) >= 0)
-		;
-}
+	uint8_t aRxBuf[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
+	uint8_t *pRxPos;
+	int nDataSize;
+	int bCRC = 0;
+	uint8_t trychar = 'C';
+	uint8_t nRxPktNo = 1;
+	int nTmp;
+	int nRxByte = 0;
+	int nRestChance = MAXRETRANS;
 
-int xmodemReceive(unsigned char *dest, int destsz)
-{
-	unsigned char xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
-	unsigned char *p;
-	int bufsz, crc = 0;
-	unsigned char trychar = 'C';
-	unsigned char packetno = 1;
-	int i, c, len = 0;
-	int retry, retrans = MAXRETRANS;
-
-	for (;;)
+	while(1)
 	{
-		for (retry = 0; retry < 16; ++retry)
+		for (int nTry = 0; nTry < MAX_RETRY; ++nTry)
 		{
 			if (trychar)
-				_outbyte(trychar);
-			if ((c = _inbyte((DLY_1S) << 1)) >= 0)
+				UART_TxByte(trychar);
+			if ((nTmp = UART_RxByte(SEC(2))) >= 0)
 			{
-				switch (c)
+				switch (nTmp)
 				{
 				case SOH:
-					bufsz = 128;
-					goto start_recv;
+					nDataSize = 128;
+					goto RECV;
 				case STX:
-					bufsz = 1024;
-					goto start_recv;
+					nDataSize = 1024;
+					goto RECV;
 				case EOT:
-					flushinput();
-					_outbyte(ACK);
-					return len; /* normal end */
+					while (UART_RxByte(MSEC(10)) >= 0){}
+					UART_TxByte(ACK);
+					return nRxByte; /* normal end */
 				case CAN:
-					if ((c = _inbyte(DLY_1S)) == CAN)
+					if ((nTmp = UART_RxByte(SEC(1))) == CAN)
 					{
-						flushinput();
-						_outbyte(ACK);
+						while (UART_RxByte(MSEC(10)) >= 0){}
+						UART_TxByte(ACK);
 						return -1; /* canceled by remote */
 					}
 					break;
@@ -94,86 +89,88 @@ int xmodemReceive(unsigned char *dest, int destsz)
 			trychar = NAK;
 			continue;
 		}
-		flushinput();
-		_outbyte(CAN);
-		_outbyte(CAN);
-		_outbyte(CAN);
+		while (UART_RxByte(MSEC(10)) >= 0){}
+		UART_TxByte(CAN);
+		UART_TxByte(CAN);
+		UART_TxByte(CAN);
 		return -2; /* sync error */
 
-	start_recv:
+	RECV:
 		if (trychar == 'C')
-			crc = 1;
+			bCRC = 1;
 		trychar = 0;
-		p = xbuff;
-		*p++ = c;
-		for (i = 0; i < (bufsz + (crc ? 1 : 0) + 3); ++i)
+		pRxPos = aRxBuf;
+		*pRxPos++ = nTmp;
+		for (int i = 0; i < (nDataSize + bCRC + 3); i++)
 		{
-			if ((c = _inbyte(DLY_1S)) < 0)
-				goto reject;
-			*p++ = c;
+			if ((nTmp = UART_RxByte(SEC(2))) < 0)
+				goto REJECT;
+			*pRxPos++ = nTmp;
 		}
 
-		if (xbuff[1] == (unsigned char)(~xbuff[2]) &&
-			(xbuff[1] == packetno || xbuff[1] == (unsigned char)packetno - 1) &&
-			check(crc, &xbuff[3], bufsz))
+		// Good packet.
+		if (aRxBuf[1] == (uint8_t)(~aRxBuf[2]) &&
+			(aRxBuf[1] == nRxPktNo || aRxBuf[1] == nRxPktNo - 1) &&
+			check(bCRC, &aRxBuf[3], nDataSize))
 		{
-			if (xbuff[1] == packetno)
+			if (aRxBuf[1] == nRxPktNo)
 			{
-				register int count = destsz - len;
-				if (count > bufsz)
-					count = bufsz;
-				if (count > 0)
+				int nSizeData = nReqSize - nRxByte;
+				if (nSizeData > nDataSize)
+					nSizeData = nDataSize;
+				if (nSizeData > 0)
 				{
-					memcpy(&dest[len], &xbuff[3], count);
-					len += count;
+					memcpy(&pBuf[nRxByte], &aRxBuf[3], nSizeData);
+					nRxByte += nSizeData;
 				}
-				++packetno;
-				retrans = MAXRETRANS + 1;
+				nRxPktNo++; // Success.
+				nRestChance = MAXRETRANS + 1;
 			}
-			if (--retrans <= 0)
+			if (--nRestChance <= 0)
 			{
-				flushinput();
-				_outbyte(CAN);
-				_outbyte(CAN);
-				_outbyte(CAN);
+				while (UART_RxByte(MSEC(10)) >= 0){}
+				UART_TxByte(CAN);
+				UART_TxByte(CAN);
+				UART_TxByte(CAN);
 				return -3; /* too many retry error */
 			}
-			_outbyte(ACK);
+			UART_TxByte(ACK);
 			continue;
 		}
-	reject:
-		flushinput();
-		_outbyte(NAK);
+	REJECT:
+		while (UART_RxByte(MSEC(10)) >= 0){}
+		UART_TxByte(NAK);
 	}
 }
 
-int xmodemTransmit(unsigned char *src, int srcsz)
+int XM_Transmit(uint8_t *pReqBuf, int nReqSize)
 {
-	unsigned char xbuff[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
-	int bufsz, crc = -1;
-	unsigned char packetno = 1;
-	int i, c, len = 0;
-	int retry;
+	uint8_t anTxBuf[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
+	int nDataSize;
+	int bCRC = 0;
+	uint8_t nPktNo = 1;
+	int nSent = 0;
+	int nTmp;
 
-	for (;;)
+	while(1)
 	{
-		for (retry = 0; retry < 16; ++retry)
+		for (int nTry = 0; nTry < 16; nTry++)
 		{
-			if ((c = _inbyte((DLY_1S) << 1)) >= 0)
+			if ((nTmp = UART_RxByte(SEC(2))) >= 0)
 			{
-				switch (c)
+				switch (nTmp)
 				{
 				case 'C':
-					crc = 1;
-					goto start_trans;
+					bCRC = 1;
+					goto TRANS;
 				case NAK:
-					crc = 0;
-					goto start_trans;
+					bCRC = 0;
+					goto TRANS;
 				case CAN:
-					if ((c = _inbyte(DLY_1S)) == CAN)
+					if ((nTmp = UART_RxByte(SEC(1))) == CAN)
 					{
-						_outbyte(ACK);
-						flushinput();
+						UART_TxByte(ACK);
+						while (UART_RxByte(MSEC(10)) >= 0){}
 						return -1; /* canceled by remote */
 					}
 					break;
@@ -182,67 +179,67 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 				}
 			}
 		}
-		_outbyte(CAN);
-		_outbyte(CAN);
-		_outbyte(CAN);
-		flushinput();
+		UART_TxByte(CAN);
+		UART_TxByte(CAN);
+		UART_TxByte(CAN);
+		while (UART_RxByte(MSEC(10)) >= 0){}
 		return -2; /* no sync */
 
-		for (;;)
+		while(1)
 		{
-		start_trans:
+		TRANS:
 #if (TRANSMIT_XMODEM_1K == 1)
-			xbuff[0] = STX;
-			bufsz = 1024;
+			anTxBuf[0] = STX;
+			nDataSize = 1024;
 #else
-			xbuff[0] = SOH;
-			bufsz = 128;
+			anTxBuf[0] = SOH;
+			nDataSize = 128;
 #endif
-			xbuff[1] = packetno;
-			xbuff[2] = ~packetno;
-			c = srcsz - len;
-			if (c > bufsz)
-				c = bufsz;
-			if (c > 0)
+			anTxBuf[1] = nPktNo;
+			anTxBuf[2] = ~nPktNo;
+			int nTxByte = nReqSize - nSent;
+			if (nTxByte > nDataSize)
+				nTxByte = nDataSize;
+			if (nTxByte > 0)
 			{
-				memset(&xbuff[3], 0, bufsz);
-				memcpy(&xbuff[3], &src[len], c);
-				if (c < bufsz)
-					xbuff[3 + c] = CTRLZ;
-				if (crc)
+				memset(&anTxBuf[3], 0, nDataSize);
+				memcpy(&anTxBuf[3], &pReqBuf[nSent], nTxByte);
+				if (nTxByte < nDataSize)
+					anTxBuf[3 + nTxByte] = CTRLZ;
+				if (bCRC)
 				{
-					unsigned short ccrc = crc16_ccitt(&xbuff[3], bufsz);
-					xbuff[bufsz + 3] = (ccrc >> 8) & 0xFF;
-					xbuff[bufsz + 4] = ccrc & 0xFF;
+					uint16_t ccrc = CRC16_ccitt(&anTxBuf[3], nDataSize);
+					anTxBuf[nDataSize + 3] = (ccrc >> 8) & 0xFF;
+					anTxBuf[nDataSize + 4] = ccrc & 0xFF;
 				}
 				else
 				{
-					unsigned char ccks = 0;
-					for (i = 3; i < bufsz + 3; ++i)
+					uint8_t nChkSum = 0;
+					for (int i = 3; i < nDataSize + 3; ++i)
 					{
-						ccks += xbuff[i];
+						nChkSum += anTxBuf[i];
 					}
-					xbuff[bufsz + 3] = ccks;
+					anTxBuf[nDataSize + 3] = nChkSum;
 				}
-				for (retry = 0; retry < MAXRETRANS; ++retry)
+				for (int nTry = 0; nTry < MAXRETRANS; nTry++)
 				{
-					for (i = 0; i < bufsz + 4 + (crc ? 1 : 0); ++i)
+					for (int i = 0; i < nDataSize + 4 + bCRC; i++)
 					{
-						_outbyte(xbuff[i]);
+						UART_TxByte(anTxBuf[i]);
 					}
-					if ((c = _inbyte(DLY_1S)) >= 0)
+					if ((nTmp = UART_RxByte(SEC(1))) >= 0)
 					{
-						switch (c)
+						switch (nTmp)
 						{
 						case ACK:
-							++packetno;
-							len += bufsz;
-							goto start_trans;
+							++nPktNo;
+							nSent += nDataSize;
+							goto TRANS;
 						case CAN:
-							if ((c = _inbyte(DLY_1S)) == CAN)
+							if ((nTmp = UART_RxByte(SEC(1))) == CAN)
 							{
-								_outbyte(ACK);
-								flushinput();
+								UART_TxByte(ACK);
+								while (UART_RxByte(MSEC(10)) >= 0){}
 								return -1; /* canceled by remote */
 							}
 							break;
@@ -252,47 +249,24 @@ int xmodemTransmit(unsigned char *src, int srcsz)
 						}
 					}
 				}
-				_outbyte(CAN);
-				_outbyte(CAN);
-				_outbyte(CAN);
-				flushinput();
+				UART_TxByte(CAN);
+				UART_TxByte(CAN);
+				UART_TxByte(CAN);
+				while (UART_RxByte(MSEC(10)) >= 0){}
 				return -4; /* xmit error */
 			}
 			else
 			{
-				for (retry = 0; retry < 10; ++retry)
+				for (int nTry = 0; nTry < 10; nTry++)
 				{
-					_outbyte(EOT);
-					if ((c = _inbyte((DLY_1S) << 1)) == ACK)
+					UART_TxByte(EOT);
+					if ((nTmp = UART_RxByte(SEC(2))) == ACK)
 						break;
 				}
-				flushinput();
-				return (c == ACK) ? len : -5;
+				while (UART_RxByte(MSEC(10)) >= 0){}
+				return (nTmp == ACK) ? nSent : -5;
 			}
 		}
 	}
+	return -6;
 }
-
-#ifdef TEST_XMODEM_RECEIVE
-int main(void)
-{
-	int st;
-
-	printf("Send data using the xmodem protocol from your terminal emulator now...\n");
-	/* the following should be changed for your environment:
-	   0x30000 is the download address,
-	   65536 is the maximum size to be written at this address
-	 */
-	st = xmodemReceive((char *)0x30000, 65536);
-	if (st < 0)
-	{
-		printf("Xmodem receive error: status: %d\n", st);
-	}
-	else
-	{
-		printf("Xmodem successfully received %d bytes\n", st);
-	}
-
-	return 0;
-}
-#endif

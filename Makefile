@@ -3,7 +3,7 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := spiffs
+PROJECT_NAME := mstore
 
 include $(IDF_PATH)/make/project.mk
 

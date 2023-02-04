@@ -11,7 +11,7 @@
 #include <sys/unistd.h>
 #include <sys/stat.h>
 #include "freertos/FreeRTOS.h"
-//#include "freertos/task.h"
+#include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_spiffs.h"
@@ -22,8 +22,8 @@
 #include "esp_vfs_dev.h"
 #include "esp_vfs_fat.h"
 
-#include "modem.h"
-
+#include "xmodem.h"
+#include "uart.h"
 
 static const char *TAG = "APP";
 
@@ -31,12 +31,16 @@ static const char *TAG = "APP";
 
 #define DBG_BUG_SIZE (128)
 
-uint16_t aDbg[DBG_BUG_SIZE];
+uint16_t aKey[DBG_BUG_SIZE];
+uint16_t aVal[DBG_BUG_SIZE];
+
 uint32_t nDbgIdx;
 
-void DBG_Add(uint8_t nKey, uint8_t nVal)
+void DBG_Add(uint16_t nKey, uint16_t nVal)
 {
-	aDbg[nDbgIdx++] = ((uint16_t)nKey) << 8 | nVal;
+	aKey[nDbgIdx] = nKey;
+	aVal[nDbgIdx] = nVal;
+	nDbgIdx++;
 }
 
 void dbg_Dump()
@@ -44,7 +48,7 @@ void dbg_Dump()
 	printf("DBG Dump\n");
 	for (uint32_t nIdx = 0; nIdx < nDbgIdx; nIdx++)
 	{
-		printf("{%d, %02X }", aDbg[nIdx] >> 8, aDbg[nIdx] & 0xFF);
+		printf("{%d: %02X}\n", aKey[nIdx], aVal[nIdx]);
 	}
 }
 
@@ -81,14 +85,18 @@ void app_main(void)
 	const char *szLine = "Hello World..\n";
 	uart_tx_chars(CONFIG_ESP_CONSOLE_UART_NUM, szLine, strlen(szLine));
 
-	uint8_t nCmd;
-
 	int nRet = 0;
-	memset(aXBuf, '$', BUF_SIZE);
+	for(int i=0; i< BUF_SIZE; i++)
+	{
+		aXBuf[i] = 0xCC;
+		if(0 == (i % 128)) aXBuf[i] = 0xA0 + ((i / 128) % 16);
+	}
+	
 	while (true)
 	{
-		while (1 > UART_RxData(&nCmd, 1))
-			;
+		int16_t nCmd = UART_RxByte(SEC(1));
+		if(nCmd < 0) 
+			continue;
 		switch (nCmd)
 		{
 		case 'P':
@@ -105,14 +113,14 @@ void app_main(void)
 		{
 			printf("Start Xmodem RX\n");
 			gCtx.nNext = 0;
-			nRet = XmodemTransmit(prepareTxData, &gCtx, BUF_SIZE, 1, 0);
+			nRet = xmodemTransmit(aXBuf, BUF_SIZE);
 			break;
 		}
 		case 'R':
 		{
 			printf("Start Xmodem TX\n");
 			gCtx.nNext = 0;
-			nRet = XmodemReceive(getRxData, &gCtx, 10 * 1024, 0, 0);
+			nRet = xmodemReceive(aXBuf, BUF_SIZE);
 			break;
 		}
 		case 'D':

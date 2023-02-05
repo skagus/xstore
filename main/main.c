@@ -24,11 +24,11 @@
 
 #include "xmodem.h"
 #include "uart.h"
+#include "console.h"
 
 static const char *TAG = "APP";
 
 #define BUF_SIZE (3000)
-
 #define DBG_BUG_SIZE (128)
 
 uint16_t aKey[DBG_BUG_SIZE];
@@ -45,31 +45,24 @@ void DBG_Add(uint16_t nKey, uint16_t nVal)
 
 void dbg_Dump()
 {
-	printf("DBG Dump\n");
 	for (uint32_t nIdx = 0; nIdx < nDbgIdx; nIdx++)
 	{
 		printf("{%d: %02X}\n", aKey[nIdx], aVal[nIdx]);
 	}
 }
 
-struct Ctx
+void buf_dump(uint8_t* pBuf, uint32_t nSize)
 {
-	uint32_t nNext;
-} gCtx;
-
-uint8_t aXBuf[BUF_SIZE];
-
-void prepareTxData(void *pCtx, void *pTxBuf, int nSize)
-{
-	uint8_t *pSrc = aXBuf + gCtx.nNext;
-	memcpy(pTxBuf, pSrc, nSize);
-	gCtx.nNext += nSize;
+	for (uint32_t nIdx = 0; nIdx < nSize; nIdx++)
+	{
+		if(0 == (nIdx % 32))
+			printf("\n %4X: ", nIdx / 32);
+		printf("%2X ", pBuf[nIdx]);
+	}
 }
 
-void getRxData(void *pCtx, void *pRxBuf, int nSize)
-{
-	// nothing.
-}
+uint8_t aRBuf[BUF_SIZE];
+uint8_t aTBuf[BUF_SIZE];
 
 void app_main(void)
 {
@@ -85,51 +78,54 @@ void app_main(void)
 	const char *szLine = "Hello World..\n";
 	uart_tx_chars(CONFIG_ESP_CONSOLE_UART_NUM, szLine, strlen(szLine));
 
-	int nRet = 0;
 	for(int i=0; i< BUF_SIZE; i++)
 	{
-		aXBuf[i] = 0xCC;
-		if(0 == (i % 128)) aXBuf[i] = 0xA0 + ((i / 128) % 16);
+		aTBuf[i] = 0xCC;
+		if(0 == (i % 32)) aTBuf[i] = (i / 32);
 	}
-	
+	char aLine[32];
+	char* aArgs[MAX_CMD_TOKEN];
 	while (true)
 	{
-		int16_t nCmd = UART_RxByte(SEC(1));
-		if(nCmd < 0) 
-			continue;
-		switch (nCmd)
+		uint32_t nLen = CON_GetLine(aLine, 32);
+		if(nLen <= 0) continue;
+
+		printf("CMD:%s:", aLine);
+		CON_Token(aLine, aArgs);
+
+		int nRet = 0;
+		if(CMD_COMP(aArgs[0], "rbuf"))
 		{
-		case 'P':
-		{
-			printf("Dump X Buf with Ret: %d\n", nRet);
-			for (uint32_t nIdx = 0; nIdx < BUF_SIZE; nIdx++)
-			{
-				printf("%X ", aXBuf[nIdx]);
-			}
+			printf("Dump R Buf\n");
+			buf_dump(aRBuf, BUF_SIZE);
 			printf("\n");
-			break;
 		}
-		case 'S':
+		else if(CMD_COMP(aArgs[0], "tbuf"))
 		{
-			printf("Start Xmodem RX\n");
-			gCtx.nNext = 0;
-			nRet = XM_Transmit(aXBuf, BUF_SIZE);
+			printf("Dump S Buf\n");
+			buf_dump(aTBuf, BUF_SIZE);
+			printf("\n");
+		}
+		else if(CMD_COMP(aArgs[0], "tx"))
+		{
+			printf("Start to T -> PC\n");
+			nRet = XM_Transmit(aTBuf, BUF_SIZE);
 			printf("Ret: %d\n", nRet);
-			break;
 		}
-		case 'R':
+		else if(CMD_COMP(aArgs[0], "rx"))
 		{
-			printf("Start Xmodem TX\n");
-			gCtx.nNext = 0;
-			nRet = XM_Receive(aXBuf, BUF_SIZE);
+			printf("Start to PC -> T\n");
+			nRet = XM_Receive(aRBuf, BUF_SIZE);
 			printf("Ret: %d\n", nRet);
-			break;
 		}
-		case 'D':
+		else if(CMD_COMP(aArgs[0], "dbg"))
 		{
+			printf("Debug dump\n");
 			dbg_Dump();
-			break;
 		}
+		else
+		{
+			printf("supported cmd : buf, tx, rx, dbg \n");
 		}
 	}
 }

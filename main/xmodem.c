@@ -143,7 +143,7 @@ int XM_Receive(uint8_t* pBuf, int nReqSize)
 	}
 }
 
-int XM_Transmit(uint8_t *pReqBuf, int nReqSize)
+int XM_Transmit(TreatFunc fTreat, void* pCtx, int nReqSize)
 {
 	uint8_t anTxBuf[1030]; /* 1024 for XModem 1k + 3 head chars + 2 crc + nul */
 	int nDataSize;
@@ -203,7 +203,9 @@ int XM_Transmit(uint8_t *pReqBuf, int nReqSize)
 			if (nTxByte > 0)
 			{
 				memset(&anTxBuf[3], 0, nDataSize);
-				memcpy(&anTxBuf[3], &pReqBuf[nSent], nTxByte);
+
+//				memcpy(&anTxBuf[3], &pReqBuf[nSent], nTxByte);
+				fTreat(pCtx, nSent, &anTxBuf[3], nTxByte);
 				if (nTxByte < nDataSize)
 					anTxBuf[3 + nTxByte] = CTRLZ;
 				if (bCRC)

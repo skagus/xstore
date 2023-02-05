@@ -64,6 +64,16 @@ void buf_dump(uint8_t* pBuf, uint32_t nSize)
 uint8_t aRBuf[BUF_SIZE];
 uint8_t aTBuf[BUF_SIZE];
 
+void txData(void* pCtx, uint32_t nOffset, uint8_t* pDstBuf, uint32_t nBytes)
+{
+	memcpy(pDstBuf, &(aTBuf[nOffset]), nBytes);
+}
+
+void rxData(void* pCtx, uint32_t nOffset, uint8_t* pSrcBuf, uint32_t nBytes)
+{
+	memcpy(&(aRBuf[nOffset]), pSrcBuf, nBytes);
+}
+
 void app_main(void)
 {
 	ESP_LOGI(TAG, "Start APP");
@@ -109,7 +119,7 @@ void app_main(void)
 		else if(CMD_COMP(aArgs[0], "tx"))
 		{
 			printf("Start to T -> PC\n");
-			nRet = XM_Transmit(aTBuf, BUF_SIZE);
+			nRet = XM_Transmit(txData, NULL, BUF_SIZE);
 			printf("Ret: %d\n", nRet);
 		}
 		else if(CMD_COMP(aArgs[0], "rx"))

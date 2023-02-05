@@ -7,5 +7,5 @@
 */
 typedef void (*TreatFunc)(void* pCtx, uint32_t nOffset, uint8_t* pBuf, uint32_t nBytes);
 
-int XM_Receive(uint8_t* pBuf, int nReqSize);
+int XM_Receive(TreatFunc fTreat, void* pCtx, int nReqSize);
 int XM_Transmit(TreatFunc fTreat, void* pCtx, int nReqSize);

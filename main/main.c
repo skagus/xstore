@@ -125,7 +125,7 @@ void app_main(void)
 		else if(CMD_COMP(aArgs[0], "rx"))
 		{
 			printf("Start to PC -> T\n");
-			nRet = XM_Receive(aRBuf, BUF_SIZE);
+			nRet = XM_Receive(rxData, NULL, BUF_SIZE);
 			printf("Ret: %d\n", nRet);
 		}
 		else if(CMD_COMP(aArgs[0], "dbg"))

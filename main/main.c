@@ -21,7 +21,6 @@
 
 #include "xmodem.h"
 #include "uart.h"
-#include "console.h"
 #include "dos.h"
 #include "cli.h"
 

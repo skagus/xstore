@@ -5,8 +5,8 @@
 #define MSEC(x)			((x) * configTICK_RATE_HZ / 1000)
 
 int16_t UART_RxByte(uint32_t nDelay);
+uint32_t UART_RxD(char* pnRet);
 void UART_TxByte(uint8_t nData);
 int UART_RxData(uint8_t* aBuf, uint32_t nBufSize, uint32_t nDelay);
 void UART_TxData(uint8_t* aBuf, uint32_t nBufSize);
-
 

@@ -3,7 +3,7 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := mstore
+PROJECT_NAME := xstore
 
 include $(IDF_PATH)/make/project.mk
 

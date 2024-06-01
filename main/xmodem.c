@@ -2,6 +2,8 @@
 #include <string.h>
 #include "crc16.h"
 #include "uart.h"
+#include "cli.h"
+
 #include "xmodem.h"
 
 #define SOH 0x01
@@ -269,4 +271,80 @@ int XM_Transmit(TreatFunc fTreat, void* pCtx, int nReqSize)
 		}
 	}
 	return -6;
+}
+
+#define BUF_SIZE (3000)
+
+uint8_t aRBuf[BUF_SIZE];
+uint8_t aTBuf[BUF_SIZE];
+
+
+void txData(void* pCtx,uint32_t nOffset,uint8_t* pDstBuf,uint32_t nBytes)
+{
+	XCtx* pXCtx = (XCtx*)pCtx;
+	if(NULL != pXCtx->pFile)
+	{
+		fread(pDstBuf,1,nBytes,pXCtx->pFile);
+	}
+	else
+	{
+		memcpy(pDstBuf,&(aTBuf[nOffset]),nBytes);
+	}
+}
+
+void rxData(void* pCtx,uint32_t nOffset,uint8_t* pSrcBuf,uint32_t nBytes)
+{
+	XCtx* pXCtx = (XCtx*)pCtx;
+	pXCtx->nBytes += nBytes;
+	if(NULL != pXCtx->pFile)
+	{
+		fwrite(pSrcBuf,1,nBytes,pXCtx->pFile);
+	}
+	else
+	{
+		memcpy(&(aRBuf[nOffset]),pSrcBuf,nBytes);
+	}
+}
+
+void xm_Tx(uint8_t argc,char* argv[])
+{
+	printf("Start to T -> PC\n");
+	int nRet = XM_Transmit(txData,NULL,BUF_SIZE);
+	printf("Ret: %d\n",nRet);
+}
+
+
+void xm_Rx(uint8_t argc,char* argv[])
+{
+	printf("Start to PC -> T\n");
+	XCtx stRxCtx;
+	stRxCtx.pFile = fopen("/sf/test.bin","w");
+	stRxCtx.nBytes = 0;
+	int nRet = XM_Receive(rxData,&stRxCtx,BUF_SIZE);
+	fclose(stRxCtx.pFile);
+	printf("Ret: %d, %d\n",nRet,stRxCtx.nBytes);
+}
+
+void buf_dump(uint8_t* pBuf,uint32_t nSize)
+{
+	for(uint32_t nIdx = 0; nIdx < nSize; nIdx++)
+	{
+		if(0 == (nIdx % 32))
+			printf("\n %4X: ",nIdx / 32);
+		printf("%2X ",pBuf[nIdx]);
+	}
+}
+
+void _dump_RBuf(uint8_t argc,char* argv[])
+{
+	printf("Dump R Buf\n");
+	buf_dump(aRBuf,BUF_SIZE);
+	printf("\n");
+}
+
+void XM_Init()
+{
+	CLI_Register("tx",xm_Tx);
+	CLI_Register("rx",xm_Rx);
+	CLI_Register("rdump",_dump_RBuf);
 }

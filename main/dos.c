@@ -11,10 +11,18 @@
 
 #define MAX_PATH_LEN		(260)
 
+#define FS_LABEL			"storage"
+
+void _fs_format(uint8_t argc,char* argv[])
+{
+	printf("It takes a few seconds / minutes\n");
+	esp_spiffs_format(FS_LABEL);
+}
+
 void _fs_info(uint8_t argc,char* argv[])
 {
 	size_t total = 0,used = 0;
-	int ret = esp_spiffs_info(NULL,&total,&used);
+	int ret = esp_spiffs_info(FS_LABEL,&total,&used);
 	if(ret == ESP_OK)
 	{
 		printf("Partition size: total: %d, used: %d",total,used);
@@ -180,7 +188,7 @@ esp_err_t DOS_Init()
 	esp_vfs_spiffs_conf_t conf =
 	{
 		.base_path = "/sf",
-		.partition_label = NULL,
+		.partition_label = FS_LABEL,
 		.max_files = 5,
 		.format_if_mount_failed = true
 	};
@@ -189,6 +197,7 @@ esp_err_t DOS_Init()
 	if(ESP_OK == ret)
 	{
 		CLI_Register("fs_info",_fs_info);
+		CLI_Register("fs_format",_fs_format);
 		CLI_Register("fs_read",_fs_read);
 		CLI_Register("fs_dump",_fs_dump);
 		CLI_Register("fs_write",_fs_write);

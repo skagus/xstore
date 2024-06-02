@@ -12,13 +12,10 @@
 #include "dos.h"
 
 #define MAX_PATH_LEN		(260)
-#define FS_LFS				(0)
+#define FS_LFS				(1)		// LittleFS or SPIFFS
 
-#if (FS_LFS)
-#define FS_LABEL			"littlefs"
-#else
+// match your partition table.
 #define FS_LABEL			"storage"
-#endif
 
 void _fs_format(uint8_t argc,char* argv[])
 {
@@ -52,10 +49,9 @@ void _fs_write(uint8_t argc,char* argv[])
 {
 	if(argc < 2)
 	{
-		printf("needs file name\n");
+		printf("Needs file name, ref 'copy con'\n");
 		return;
 	}
-	printf("This is 'copy con'\n");
 
 	char nRcv;
 	// Use POSIX and C standard library functions to work with files.
@@ -93,6 +89,7 @@ void _fs_list(uint8_t argc,char* argv[])
 		return;
 	}
 
+	char szPath[MAX_PATH_LEN];
 	DIR* pDir = opendir(argv[1]);
 	struct dirent* pEntry;
 	struct stat st;
@@ -100,10 +97,10 @@ void _fs_list(uint8_t argc,char* argv[])
 	{
 		while((pEntry = readdir(pDir)) != NULL)
 		{
-#if 1
+#if 0
 			printf("%s\n",pEntry->d_name);
 #else
-			snprintf(szPath,MAX_PATH_LEN,"/fs/%s",(char*)(pEntry->d_name));
+			snprintf(szPath,MAX_PATH_LEN,"%s/%s",argv[1],(char*)(pEntry->d_name));
 			stat(szPath, &st);
 			printf("%s (%ld bytes)\n",pEntry->d_name,st.st_size);
 #endif
@@ -240,6 +237,10 @@ esp_err_t DOS_Init()
 		CLI_Register("fs_write",_fs_write);
 		CLI_Register("fs_list",_fs_list);
 		CLI_Register("fs_delete",_fs_delete);
+	}
+	else
+	{
+		printf("Error while FS register: 0x%X\n", ret);
 	}
 	return ret;
 }

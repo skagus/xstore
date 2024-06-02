@@ -1,4 +1,4 @@
-# Name,   Type, SubType, Offset,  Size, Flags
+# Name, Type, SubType, Offset, Size, Flags
 # Note: if you change the phy_init or app partition offset, make sure to change the offset in Kconfig.projbuild
 # 512K == 0x80000
 # Bootloader: size : 0x0000 ~ 0x3000	# real size: 0x2B40

@@ -72,14 +72,9 @@ void app_main(void)
 
 	printf("\n\nHello world!2222\n");
 
-
-	ESP_LOGI(TAG,"%s %d\n", __FILE__, __LINE__);
 	CLI_Init();
-#if 1
-	ESP_LOGI(TAG,"%s %d\n",__FILE__,__LINE__);
 	DOS_Init();
-	ESP_LOGI(TAG,"%s %d\n",__FILE__,__LINE__);
-#endif
+
 	CLI_Register("dbg",_dbg_dump);
 
 	int nCnt = 0;

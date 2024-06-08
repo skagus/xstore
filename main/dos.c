@@ -62,7 +62,7 @@ void _fs_write(uint8_t argc,char* argv[])
 	{
 		while(1)
 		{
-			if(UART_RxD(&nRcv))
+			if(UART_RxByte(&nRcv, 0))
 			{
 				if(0x1A == nRcv) // Ctrl-Z
 				{
@@ -190,7 +190,7 @@ void _fs_dump(uint8_t argc,char* argv[])
 			{
 				break;
 			}
-			printf(" %4X : ",nCnt * SIZE_DUMP_BUF);
+			printf(" %4lX : ",nCnt * SIZE_DUMP_BUF);
 			for(uint8_t nIdx = 0; nIdx < nBytes; nIdx++)
 			{
 				printf("%02X ",aBuf[nIdx]);

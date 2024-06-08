@@ -36,3 +36,7 @@
 
 #define MAX(a, b) 					((a) > (b) ? (a) : (b))
 #define MIN(a, b) 					((a) < (b) ? (a) : (b))
+
+#define SEC(x)			((x) * configTICK_RATE_HZ)
+#define MSEC(x)			((x) * configTICK_RATE_HZ / 1000)
+

@@ -3,12 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "FreeRTOS.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "uart.h"
-#include "macro.h"
-#include "cli.h"
 #include "esp_log.h"
+
+#include "macro.h"
+#include "uart.h"
+#include "cli.h"
 
 static const char* TAG = "CLI";
 
@@ -18,7 +19,6 @@ static const char* TAG = "CLI";
 #define MAX_ARG_TOKEN       (8)
 
 #define COUNT_LINE_BUF       (8)
-
 
 /**
  * history.
@@ -42,8 +42,8 @@ void cli_CmdHelp(uint8_t argc,char* argv[])
 {
 	if(argc > 1)
 	{
-		uint32_t nNum = atoi(argv[1]);
-		printf("help with %X\n", nNum);
+		int32_t nNum = atoi(argv[1]);
+		printf("help with %lX\n", nNum);
 		char* aCh = (char*)&nNum;
 		printf("help with %02X %02X %02X %02X\n",
 			aCh[0], aCh[1], aCh[2], aCh[3]);
@@ -158,7 +158,6 @@ void cli_RunCmd(char* szCmdLine)
 	}
 }
 
-#include "driver/uart.h"
 char aLine[LEN_LINE];
 
 void cli_Run(void* pParam)
@@ -167,11 +166,11 @@ void cli_Run(void* pParam)
 	uint8_t nLen = 0;
 	char nCh;
 
-//	printf("Start CLI\n");
+	printf("Start CLI\n");
 
 	while(1)
 	{
-		while(UART_RxD(&nCh))
+		while(UART_RxByte(&nCh, 0))
 		{
 			if(' ' <= nCh && nCh <= '~')
 			{
@@ -202,10 +201,10 @@ void cli_Run(void* pParam)
 			else if(0x1B == nCh) // Escape sequence.
 			{
 				char nCh2,nCh3;
-				while(0 == UART_RxD(&nCh2));
+				while(0 == UART_RxByte(&nCh2, SEC(1)));
 				if(0x5B == nCh2) // direction.
 				{
-					while(0 == UART_RxD(&nCh3));
+					while(0 == UART_RxByte(&nCh3, SEC(1)));
 					if(0x41 == nCh3) // up.
 					{
 						nLen = lb_GetNextEntry(false,aLine);

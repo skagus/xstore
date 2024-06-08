@@ -1,9 +1,9 @@
 #include <stdint.h>
 #include <string.h>
+#include "macro.h"
 #include "crc16.h"
 #include "uart.h"
 #include "cli.h"
-
 #include "xmodem.h"
 
 #define SOH 0x01
@@ -59,7 +59,7 @@ int XM_Receive(TreatFunc fTreat, void* pCtx, int nReqSize)
 		{
 			if (trychar)
 				UART_TxByte(trychar);
-			if ((nTmp = UART_RxByte(SEC(2))) >= 0)
+			if(UART_RxByte(&nTmp, SEC(2)))
 			{
 				switch (nTmp)
 				{
@@ -70,15 +70,18 @@ int XM_Receive(TreatFunc fTreat, void* pCtx, int nReqSize)
 					nDataSize = 1024;
 					goto RECV;
 				case EOT:
-					while (UART_RxByte(MSEC(10)) >= 0){}
+					while (UART_RxByte(&nTmp, MSEC(10))){}
 					UART_TxByte(ACK);
 					return nRxByte; /* normal end */
 				case CAN:
-					if ((nTmp = UART_RxByte(SEC(1))) == CAN)
+					if (UART_RxByte(&nTmp, SEC(1)) > 0)
 					{
-						while (UART_RxByte(MSEC(10)) >= 0){}
-						UART_TxByte(ACK);
-						return -1; /* canceled by remote */
+						if(nTmp == CAN)
+						{
+							while(UART_RxByte(&nTmp, MSEC(10))){}
+							UART_TxByte(ACK);
+							return -1; /* canceled by remote */
+						}
 					}
 					break;
 				default:
@@ -91,7 +94,7 @@ int XM_Receive(TreatFunc fTreat, void* pCtx, int nReqSize)
 			trychar = NAK;
 			continue;
 		}
-		while (UART_RxByte(MSEC(10)) >= 0){}
+		while (UART_RxByte(&nTmp, MSEC(10)) >= 0){}
 		UART_TxByte(CAN);
 		UART_TxByte(CAN);
 		UART_TxByte(CAN);
@@ -99,13 +102,15 @@ int XM_Receive(TreatFunc fTreat, void* pCtx, int nReqSize)
 
 	RECV:
 		if (trychar == 'C')
+		{
 			bCRC = 1;
+		}
 		trychar = 0;
 		pRxPos = aRxBuf;
 		*pRxPos++ = nTmp;
 		for (int i = 0; i < (nDataSize + bCRC + 3); i++)
 		{
-			if ((nTmp = UART_RxByte(SEC(2))) < 0)
+			if (0 == (UART_RxByte(&nTmp, SEC(2))))
 				goto REJECT;
 			*pRxPos++ = nTmp;
 		}
@@ -130,7 +135,7 @@ int XM_Receive(TreatFunc fTreat, void* pCtx, int nReqSize)
 			}
 			if (--nRestChance <= 0)
 			{
-				while (UART_RxByte(MSEC(10)) >= 0){}
+				while (UART_RxByte(&nTmp, MSEC(10))){}
 				UART_TxByte(CAN);
 				UART_TxByte(CAN);
 				UART_TxByte(CAN);
@@ -140,7 +145,7 @@ int XM_Receive(TreatFunc fTreat, void* pCtx, int nReqSize)
 			continue;
 		}
 	REJECT:
-		while (UART_RxByte(MSEC(10)) >= 0){}
+		while (UART_RxByte(&nTmp, MSEC(10))){}
 		UART_TxByte(NAK);
 	}
 }
@@ -152,13 +157,13 @@ int XM_Transmit(TreatFunc fTreat, void* pCtx, int nReqSize)
 	int bCRC = 0;
 	uint8_t nPktNo = 1;
 	int nSent = 0;
-	int nTmp;
+	char nTmp;
 
 	while(1)
 	{
 		for (int nTry = 0; nTry < 16; nTry++)
 		{
-			if ((nTmp = UART_RxByte(SEC(2))) >= 0)
+			if (UART_RxByte(&nTmp, SEC(2)))
 			{
 				switch (nTmp)
 				{
@@ -169,11 +174,14 @@ int XM_Transmit(TreatFunc fTreat, void* pCtx, int nReqSize)
 					bCRC = 0;
 					goto TRANS;
 				case CAN:
-					if ((nTmp = UART_RxByte(SEC(1))) == CAN)
+					if(UART_RxByte(&nTmp, SEC(1)))
 					{
-						UART_TxByte(ACK);
-						while (UART_RxByte(MSEC(10)) >= 0){}
-						return -1; /* canceled by remote */
+						if(CAN == nTmp)
+						{
+							UART_TxByte(ACK);
+							while (UART_RxByte(&nTmp, MSEC(10))){}
+							return -1; /* canceled by remote */
+						}
 					}
 					break;
 				default:
@@ -184,7 +192,7 @@ int XM_Transmit(TreatFunc fTreat, void* pCtx, int nReqSize)
 		UART_TxByte(CAN);
 		UART_TxByte(CAN);
 		UART_TxByte(CAN);
-		while (UART_RxByte(MSEC(10)) >= 0){}
+		while (UART_RxByte(&nTmp, MSEC(10))){}
 		return -2; /* no sync */
 
 		while(1)
@@ -229,7 +237,7 @@ int XM_Transmit(TreatFunc fTreat, void* pCtx, int nReqSize)
 					{
 						UART_TxByte(anTxBuf[i]);
 					}
-					if ((nTmp = UART_RxByte(SEC(1))) >= 0)
+					if(UART_RxByte(&nTmp, SEC(1)))
 					{
 						switch (nTmp)
 						{
@@ -238,11 +246,14 @@ int XM_Transmit(TreatFunc fTreat, void* pCtx, int nReqSize)
 							nSent += nDataSize;
 							goto TRANS;
 						case CAN:
-							if ((nTmp = UART_RxByte(SEC(1))) == CAN)
+							if(UART_RxByte(&nTmp,SEC(1)))
 							{
-								UART_TxByte(ACK);
-								while (UART_RxByte(MSEC(10)) >= 0){}
-								return -1; /* canceled by remote */
+								if (CAN == nTmp)
+								{
+									UART_TxByte(ACK);
+									while (UART_RxByte(&nTmp, MSEC(10)) >= 0){}
+									return -1; /* canceled by remote */
+								}
 							}
 							break;
 						case NAK:
@@ -254,7 +265,7 @@ int XM_Transmit(TreatFunc fTreat, void* pCtx, int nReqSize)
 				UART_TxByte(CAN);
 				UART_TxByte(CAN);
 				UART_TxByte(CAN);
-				while (UART_RxByte(MSEC(10)) >= 0){}
+				while (UART_RxByte(&nTmp, MSEC(10)) >= 0){}
 				return -4; /* xmit error */
 			}
 			else
@@ -262,10 +273,13 @@ int XM_Transmit(TreatFunc fTreat, void* pCtx, int nReqSize)
 				for (int nTry = 0; nTry < 10; nTry++)
 				{
 					UART_TxByte(EOT);
-					if ((nTmp = UART_RxByte(SEC(2))) == ACK)
-						break;
+					if(UART_RxByte(&nTmp,SEC(2)))
+					{
+						if (ACK == nTmp) break;
+					}
 				}
-				while (UART_RxByte(MSEC(10)) >= 0){}
+				char nDummy;
+				while (UART_RxByte(&nDummy, MSEC(10))){}
 				return (nTmp == ACK) ? nSent : -5;
 			}
 		}
@@ -322,7 +336,7 @@ void xm_Rx(uint8_t argc,char* argv[])
 	stRxCtx.nBytes = 0;
 	int nRet = XM_Receive(rxData,&stRxCtx,BUF_SIZE);
 	fclose(stRxCtx.pFile);
-	printf("Ret: %d, %d\n",nRet,stRxCtx.nBytes);
+	printf("Ret: %d, %ld\n",nRet,stRxCtx.nBytes);
 }
 
 void buf_dump(uint8_t* pBuf,uint32_t nSize)
@@ -330,7 +344,7 @@ void buf_dump(uint8_t* pBuf,uint32_t nSize)
 	for(uint32_t nIdx = 0; nIdx < nSize; nIdx++)
 	{
 		if(0 == (nIdx % 32))
-			printf("\n %4X: ",nIdx / 32);
+			printf("\n %4lX: ",nIdx / 32);
 		printf("%2X ",pBuf[nIdx]);
 	}
 }

@@ -15,9 +15,9 @@
 #include "esp_log.h"
 #include "driver/uart.h"
 
-#include "esp_system.h"
+#include "driver/usb_serial_jtag.h"
+#include "esp_chip_info.h"
 #include "esp_console.h"
-#include "esp_vfs_dev.h"
 
 #include "xmodem.h"
 #include "uart.h"
@@ -26,7 +26,6 @@
 
 static const char *TAG = "APP";
 
-#define BUF_SIZE (3000)
 #define DBG_BUG_SIZE (128)
 
 uint16_t aKey[DBG_BUG_SIZE];
@@ -49,42 +48,68 @@ void _dbg_dump(uint8_t argc,char* argv[])
 	}
 }
 
+int gnCnt;
+#define BUF_SIZE		(32)
+void dummyTask(void* pParam)
+{
+	UART_Init();
 
+	char aBuf[BUF_SIZE];
+
+	while(1)
+	{
+#if 1
+		int len = usb_serial_jtag_read_bytes(aBuf,BUF_SIZE,500 / portTICK_PERIOD_MS);
+		if( len > 0)
+		{
+			usb_serial_jtag_write_bytes((const char*)aBuf, len,500 / portTICK_PERIOD_MS);
+//			uart_flush(UBRIDGE_UART_PORT_NUM);
+		}
+#elif 0
+		char nCh;
+		// Write data back to the USB SERIAL JTAG
+		if(UART_RxByte(&nCh, 0) > 0)
+		{
+			UART_TxByte(nCh);
+		}
+#endif
+		gnCnt++;
+//		vTaskDelay(140);
+	}
+}
+
+#include "uart.h"
 
 void app_main(void)
 {
-#if 1
-	uart_set_baudrate(CONFIG_ESP_CONSOLE_UART_NUM, 115200);
-	setvbuf(stdin, NULL, _IONBF, 0);
-	setvbuf(stdout, NULL, _IONBF, 0);
-	ESP_ERROR_CHECK(uart_driver_install(CONFIG_ESP_CONSOLE_UART_NUM, 256, 0, 0, NULL, 0));
-	esp_vfs_dev_uart_use_driver(CONFIG_ESP_CONSOLE_UART_NUM);
-	esp_vfs_dev_uart_set_rx_line_endings(ESP_LINE_ENDINGS_CR);
-	esp_vfs_dev_uart_set_rx_line_endings(ESP_LINE_ENDINGS_CRLF);
-#endif
-	printf("\n\nHello world!\n");
+	vTaskDelay(100);
+
+	UART_Init();
+	CLI_Init();
+	DOS_Init();
+
+#if 0
+	printf("Hello world! It is %s: %s\n",__DATE__,__TIME__);
 
 	/* Print chip information */
 	esp_chip_info_t chip_info;
 	esp_chip_info(&chip_info);
-	printf("This is ESP8266 chip with %d CPU cores, WiFi, ",
-		   chip_info.cores);
+	printf("This is ESP32c3 chip with %d CPU cores, WiFi\n", chip_info.cores);
 
-	printf("\n\nHello world!2222\n");
+	UART_Init();
+	printf("Checked: %s: %d\n",__FILE__,__LINE__);
+#endif
 
-	CLI_Init();
-	DOS_Init();
+//	xTaskCreate(dummyTask,"Dummy", 4096,(void*)1,tskIDLE_PRIORITY,NULL);
 
-	CLI_Register("dbg",_dbg_dump);
-
+	char aBuf[BUF_SIZE];
 	int nCnt = 0;
 	while(1)
 	{
-//		printf("In Main: %d\n",nCnt);
 		nCnt++;
 		vTaskDelay(100);
+//		UART_Printf("In Main: %d : %d\n",nCnt,gnCnt);
 	}
-
 }
 
 

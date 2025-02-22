@@ -37,8 +37,9 @@ void UART_TxData(uint8_t* aBuf,uint32_t nSize)
 void UART_Init()
 {
 #if CFG_USB_CDC
-	usb_serial_jtag_driver_config_t usb_serial_config = {.tx_buffer_size = 128,
-		.rx_buffer_size = 128};
+	usb_serial_jtag_driver_config_t usb_serial_config = 
+		{.tx_buffer_size = 2048, .rx_buffer_size = 2048};
+//		USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
 
 	ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_serial_config));
 #else

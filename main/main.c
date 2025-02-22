@@ -19,7 +19,7 @@
 #include "esp_chip_info.h"
 #include "esp_console.h"
 
-#include "xmodem.h"
+#include "ymodem.h"
 #include "uart.h"
 #include "dos.h"
 #include "cli.h"
@@ -87,6 +87,7 @@ void app_main(void)
 	UART_Init();
 	CLI_Init();
 	DOS_Init();
+	YM_Init();
 
 #if 0
 	printf("Hello world! It is %s: %s\n",__DATE__,__TIME__);

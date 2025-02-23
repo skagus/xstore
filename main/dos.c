@@ -89,21 +89,29 @@ void _fs_list(uint8_t argc,char* argv[])
 		return;
 	}
 
-	char szPath[MAX_PATH_LEN];
 	DIR* pDir = opendir(argv[1]);
-	struct dirent* pEntry;
-	struct stat st;
 	if(pDir != NULL)
 	{
+		char szPath[MAX_PATH_LEN];
+		strcpy(szPath, argv[1]);
+		strcat(szPath, "/");
+		int nLenPath = strlen(szPath);
+		struct dirent* pEntry;
+		struct stat st;
 		while((pEntry = readdir(pDir)) != NULL)
 		{
-#if 0
-			printf("%s\n",pEntry->d_name);
-#else
-			snprintf(szPath,MAX_PATH_LEN,"%s/%s",argv[1],(char*)(pEntry->d_name));
+			strcpy(szPath + nLenPath, pEntry->d_name);
 			stat(szPath, &st);
-			printf("%s (%ld bytes)\n",pEntry->d_name,st.st_size);
-#endif
+
+			if(st.st_mode & S_IFDIR)
+			{
+				printf("%s (dir)\n", pEntry->d_name);
+			}
+			else 
+			{
+				snprintf(szPath,MAX_PATH_LEN,"%s/%s",argv[1],(char*)(pEntry->d_name));
+				printf("%s (%ld bytes)\n", pEntry->d_name,st.st_size);
+			}
 		}
 		closedir(pDir);
 	}
@@ -128,6 +136,75 @@ void _fs_delete(uint8_t argc,char* argv[])
 	{
 		printf("delete %s failed\n",argv[1]);
 	}
+}
+
+void _fs_rename(uint8_t argc,char* argv[])
+{
+	if(argc < 3)
+	{
+		printf("needs file name\n");
+		return;
+	}
+	if(0 == rename(argv[1],argv[2]))
+	{
+		printf("rename %s to %s done\n",argv[1],argv[2]);
+	}
+	else
+	{
+		printf("rename %s to %s failed\n",argv[1],argv[2]);
+	}
+}
+
+void _fs_mkdir(uint8_t argc,char* argv[])
+{
+	if(argc < 2)
+	{
+		printf("needs directory name\n");
+		return;
+	}
+	if(0 == mkdir(argv[1],0))
+	{
+		printf("make directory %s done\n",argv[1]);
+	}
+	else
+	{
+		printf("make directory %s failed\n",argv[1]);
+	}
+}
+
+void _fs_copy(uint8_t argc,char* argv[])
+{
+	if(argc < 3)
+	{
+		printf("needs source and destination file name\n");
+		return;
+	}
+
+	FILE* pSrc = fopen(argv[1],"r");
+	FILE* pDst = fopen(argv[2],"w");
+
+	if(NULL != pSrc && NULL != pDst)
+	{
+		uint8_t aBuf[32];
+		int nBytes;
+
+		while(1)
+		{
+			nBytes = fread(aBuf,1,32,pSrc);
+			if(nBytes <= 0)
+			{
+				break;
+			}
+			fwrite(aBuf,1,nBytes,pDst);
+		}
+		printf("Copy done: %s --> %s\n", argv[1], argv[2]);
+	}
+	else
+	{
+		printf("Error while open: %s or %s\n",argv[1],argv[2]);
+	}
+	if(NULL != pSrc) fclose(pSrc);
+	if(NULL != pDst) fclose(pDst);
 }
 
 void _fs_read(uint8_t argc,char* argv[])
@@ -230,13 +307,16 @@ esp_err_t DOS_Init()
 	if(ESP_OK == ret)
 	{
 		printf("Mount FS to %s\n", conf.base_path);
-		CLI_Register("fs_info",_fs_info);
-		CLI_Register("fs_format",_fs_format);
-		CLI_Register("fs_read",_fs_read);
-		CLI_Register("fs_dump",_fs_dump);
+		CLI_Register("stat",_fs_info);
+		CLI_Register("format",_fs_format);
+		CLI_Register("cat",_fs_read);
+		CLI_Register("dump",_fs_dump);
 		CLI_Register("fs_write",_fs_write);
-		CLI_Register("fs_list",_fs_list);
-		CLI_Register("fs_delete",_fs_delete);
+		CLI_Register("ls",_fs_list);
+		CLI_Register("rm",_fs_delete);
+		CLI_Register("mv",_fs_rename);
+		CLI_Register("mkdir",_fs_mkdir);
+		CLI_Register("cp",_fs_copy);
 	}
 	else
 	{

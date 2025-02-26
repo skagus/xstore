@@ -248,7 +248,7 @@ void tmp_Run(void* pParam)
 }
 
 ///////////////////////
-#define STK_SIZE	(1024 * 2)	// DW.
+#define STK_SIZE	(1024 * 4)	// DW.
 
 void CLI_Init(void)
 {

@@ -103,7 +103,6 @@ void app_main(void)
 
 //	xTaskCreate(dummyTask,"Dummy", 4096,(void*)1,tskIDLE_PRIORITY,NULL);
 
-	char aBuf[BUF_SIZE];
 	int nCnt = 0;
 	while(1)
 	{

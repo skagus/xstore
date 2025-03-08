@@ -228,6 +228,26 @@ void cli_Run(void* pParam)
 }
 
 /////////////////////
+uint32_t CLI_GetInt(char* szStr)
+{
+	uint32_t nNum;
+	char* pEnd;
+	uint8_t nLen = strlen(szStr);
+	if((szStr[0] == '0') && ((szStr[1] == 'b') || (szStr[1] == 'B'))) // Binary.
+	{
+		nNum = strtoul(szStr + 2, &pEnd, 2);
+	}
+	else
+	{
+		nNum = (uint32_t)strtoul(szStr, &pEnd, 0);
+	}
+
+	if((pEnd - szStr) != nLen)
+	{
+		nNum = NOT_NUMBER;
+	}
+	return nNum;
+}
 
 void CLI_Register(char* szCmd,CmdHandler* pHandle)
 {

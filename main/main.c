@@ -23,6 +23,7 @@
 #include "uart.h"
 #include "dos.h"
 #include "cli.h"
+#include "loader.h"
 
 static const char *TAG = "APP";
 
@@ -88,6 +89,7 @@ void app_main(void)
 	CLI_Init();
 	DOS_Init();
 	YM_Init();
+	Loader_Init();
 
 #if 0
 	printf("Hello world! It is %s: %s\n",__DATE__,__TIME__);

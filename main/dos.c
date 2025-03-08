@@ -310,8 +310,8 @@ esp_err_t DOS_Init()
 		CLI_Register("stat",_fs_info);
 		CLI_Register("format",_fs_format);
 		CLI_Register("cat",_fs_read);
-		CLI_Register("dump",_fs_dump);
-		CLI_Register("fs_write",_fs_write);
+		CLI_Register("fdump",_fs_dump);
+		CLI_Register("fwrite",_fs_write);
 		CLI_Register("ls",_fs_list);
 		CLI_Register("rm",_fs_delete);
 		CLI_Register("mv",_fs_rename);
